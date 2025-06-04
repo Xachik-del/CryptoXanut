@@ -2,16 +2,16 @@
 
 # Торговые пары для фьючерсов
 SYMBOLS = [
-    "BTC/USDT:USDT",  # Формат Binance Futures
-    "ETH/USDT:USDT",
-    "SOL/USDT:USDT",
-    "BNB/USDT:USDT",
-    "DOGE/USDT:USDT",
-    "XRP/USDT:USDT",  # Ripple
-    "ADA/USDT:USDT",  # Cardano
-    "AVAX/USDT:USDT", # Avalanche
-    "MATIC/USDT:USDT", # Polygon
-    "LINK/USDT:USDT"  # Chainlink
+    "BTC/USDT",
+    "ETH/USDT",
+    "SOL/USDT",
+    "BNB/USDT",
+    "DOGE/USDT",
+    "XRP/USDT",
+    "ADA/USDT",
+    "AVAX/USDT",
+    "MATIC/USDT",
+    "LINK/USDT"
 ]
 
 # Настройки Telegram
@@ -23,8 +23,8 @@ BINANCE_API_KEY = "65PXvD8ddnf8efNpy7tc4H5LmBpPIttCOSH8AVGIOyXzfxIHcnUT5duhlnjbV
 BINANCE_API_SECRET = "rKgV2Cxpg6Ga6XKYpub98SbAyg0rMw1QA61DJPQDG09hiHSJgc9UwqSqnqwXkkCf"
 
 # Таймфреймы для фьючерсной торговли
-TIMEFRAME = "1m"  # 1-минутный таймфрейм для краткосрочной торговли
-FUTURES_INTERVAL = 30  # Проверка каждые 30 секунд
+TIMEFRAME = "5m"  # 1-минутный таймфрейм для краткосрочной торговли
+FUTURES_INTERVAL = 60  # Проверка каждые 30 секунд
 
 # Параметры торговли
 LEVERAGE = 5  # Плечо по умолчанию

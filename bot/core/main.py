@@ -6,12 +6,13 @@ import logging
 import signal
 import sys
 from datetime import datetime
-from config import (
+from bot.config import (
     SYMBOLS, FUTURES_INTERVAL, TIMEFRAME, LEVERAGE,
     BINANCE_API_KEY, BINANCE_API_SECRET
 )
-from strategy import analyze_symbol
-from data_fetch import fetch_ohlcv, validate_data
+from bot.core.strategy import analyze_symbol
+from bot.data.data_fetch import fetch_ohlcv, validate_data
+import traceback
 
 # Configure logging
 logging.basicConfig(
@@ -48,10 +49,7 @@ def initialize_exchange():
                 'defaultType': 'future',  # Use futures market
                 'adjustForTimeDifference': True,
                 'defaultContractType': 'perpetual',  # Use perpetual futures
-                'createMarketBuyOrderRequiresPrice': False,
-                'fetchMarkets': {
-                    'method': 'fapiPublicGetExchangeInfo',  # Use futures API endpoint
-                },
+                'createMarketBuyOrderRequiresPrice': False
             }
         })
         
@@ -68,17 +66,8 @@ def initialize_exchange():
             # Set leverage for all symbols
             for symbol in SYMBOLS:
                 try:
-                    # First check if we can read the current leverage
-                    current_leverage = exchange.fetch_leverage(symbol)
-                    logger.info(f"Current leverage for {symbol}: {current_leverage}")
-                    
-                    # Only set leverage if it's different from current
-                    if current_leverage != LEVERAGE:
-                        exchange.set_leverage(LEVERAGE, symbol)
-                        logger.info(f"Set leverage to {LEVERAGE}x for {symbol}")
-                    else:
-                        logger.info(f"Leverage already set to {LEVERAGE}x for {symbol}")
-                        
+                    exchange.set_leverage(LEVERAGE, symbol)
+                    logger.info(f"Set leverage to {LEVERAGE}x for {symbol}")
                 except ccxt.AuthenticationError as e:
                     logger.error(f"Authentication error for {symbol}: {str(e)}")
                     logger.error("Please check your API key permissions in Binance:")
@@ -102,6 +91,9 @@ def initialize_exchange():
             
     except Exception as e:
         logger.error(f"Failed to initialize exchange: {str(e)}")
+        logger.error(f"Exception type: {type(e)}")
+        logger.error(f"Exception args: {e.args}")
+        logger.error("Traceback:\n" + traceback.format_exc())
         raise
 
 def run_bot():

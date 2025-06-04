@@ -1,13 +1,14 @@
 # strategy.py
 
-from indicators import add_indicators
-from notifier import send_telegram_message
-from data_fetch import fetch_ohlcv
-from config import (
+from bot.indicators.indicators import add_indicators
+from bot.notifications.notifier import send_telegram_message
+from bot.data.data_fetch import fetch_ohlcv
+from bot.config import (
     TIMEFRAME, RSI_OVERSOLD, RSI_OVERBOUGHT, STOCH_OVERSOLD,
     STOCH_OVERBOUGHT, ADX_THRESHOLD, VOLUME_THRESHOLD,
     STOP_LOSS_PCT, TAKE_PROFIT_PCT, LEVERAGE
 )
+from bot.visualization.visualizer import plot_chart, plot_signal
 import logging
 import pandas as pd
 import numpy as np
@@ -169,12 +170,10 @@ def generate_signal(symbol, df):
     logger.info(f"Стохастик: {momentum['stoch_k']:.2f}/{momentum['stoch_d']:.2f}")
     logger.info(f"Всплеск объема: {volume['volume_spike']}")
     
-    # Условия для сильного сигнала на покупку (ослабленные)
-    if (trend["is_strong_trend"] and
-        (trend["ema_trend"] == "бычий" or trend["macd_trend"] == "бычий") and
+    # Условия для сильного сигнала на покупку (ослабленные для тестирования)
+    if (trend["ema_trend"] == "бычий" and  # Убрали проверку is_strong_trend
         momentum["rsi_signal"] == "перепродан" and
-        (momentum["stoch_signal"] == "перепродан" or momentum["williams_signal"] == "перепродан") and
-        volume["volume_spike"]):
+        volume["volume_trend"]):  # Заменили volume_spike на volume_trend
         
         return {
             "signal": "ПОКУПКА",
@@ -192,12 +191,10 @@ def generate_signal(symbol, df):
             }
         }
     
-    # Условия для сильного сигнала на продажу (ослабленные)
-    elif (trend["is_strong_trend"] and
-          (trend["ema_trend"] == "медвежий" or trend["macd_trend"] == "медвежий") and
+    # Условия для сильного сигнала на продажу (ослабленные для тестирования)
+    elif (trend["ema_trend"] == "медвежий" and  # Убрали проверку is_strong_trend
           momentum["rsi_signal"] == "перекуплен" and
-          (momentum["stoch_signal"] == "перекуплен" or momentum["williams_signal"] == "перекуплен") and
-          volume["volume_spike"]):
+          volume["volume_trend"]):  # Заменили volume_spike на volume_trend
         
         return {
             "signal": "ПРОДАЖА",
@@ -218,50 +215,72 @@ def generate_signal(symbol, df):
     return None
 
 def analyze_symbol(symbol, exchange):
+    """Analyze a single symbol and generate trading signals"""
     try:
-        # Получение и подготовка данных
+        # Fetch OHLCV data
         df = fetch_ohlcv(symbol, exchange, timeframe=TIMEFRAME)
+        if df is None or df.empty:
+            logger.error(f"Failed to fetch data for {symbol}")
+            return
+
+        # Add technical indicators
         df = add_indicators(df)
-        
-        # Генерация сигнала
+        df = df.dropna()  # Очистка NaN после добавления индикаторов
+
+        # Analyze market conditions
+        trend_strength = analyze_trend(df)
+        momentum = analyze_momentum(df)
+        volume_surge = analyze_volume(df)
+
+        # Log analysis results
+        logger.info(f"\nАнализ условий для {symbol}:")
+        logger.info(f"Сила тренда: {trend_strength['trend_strength']:.2f} (Порог: {ADX_THRESHOLD})")
+        logger.info(f"RSI: {momentum['rsi']:.2f} (Перепродан: {RSI_OVERSOLD}, Перекуплен: {RSI_OVERBOUGHT})")
+        logger.info(f"Стохастик: {momentum['stoch_k']:.2f}/{momentum['stoch_d']:.2f}")
+        logger.info(f"Всплеск объема: {volume_surge['volume_spike']}")
+
+        # Generate trading signal
         signal = generate_signal(symbol, df)
-        
         if signal:
-            # Форматирование сообщения
-            msg = f"\n{'🟢' if signal['signal'] == 'ПОКУПКА' else '🔴'} {signal['signal']} {symbol}\n"
-            msg += f"Сила сигнала: {signal['strength']}\n"
-            msg += f"Цена входа: {signal['price']:.2f}$\n"
-            msg += f"Стоп-лосс: {signal['stop_loss']:.2f}$ ({STOP_LOSS_PCT*100}%)\n"
-            msg += f"Тейк-профит: {signal['take_profit']:.2f}$ ({TAKE_PROFIT_PCT*100}%)\n"
-            msg += f"Размер позиции: {signal['position_size']*100:.1f}%\n"
-            msg += f"Плечо: {signal['leverage']}x\n"
+            # Send signal to Telegram
+            message = f"🔔 Сигнал для {symbol}:\n{signal['signal']} {symbol}\n"
+            message += f"Сила сигнала: {signal['strength']}\n"
+            message += f"Цена входа: {signal['price']:.2f}$\n"
+            message += f"Стоп-лосс: {signal['stop_loss']:.2f}$ ({STOP_LOSS_PCT*100}%)\n"
+            message += f"Тейк-профит: {signal['take_profit']:.2f}$ ({TAKE_PROFIT_PCT*100}%)\n"
+            message += f"Размер позиции: {signal['position_size']*100:.1f}%\n"
+            message += f"Плечо: {LEVERAGE}x\n"
             
-            # Добавление деталей анализа
+            # Add analysis details
             analysis = signal['analysis']
-            msg += f"\nАнализ тренда:\n"
-            msg += f"- Сила тренда: {analysis['trend']['trend_strength']:.2f}\n"
-            msg += f"- Тренд EMA: {analysis['trend']['ema_trend']}\n"
-            msg += f"- Тренд MACD: {analysis['trend']['macd_trend']}\n"
-            msg += f"- Тренд Ишимоку: {analysis['trend']['ichimoku_trend']}\n"
+            message += f"\nАнализ тренда:\n"
+            message += f"- Сила тренда: {analysis['trend']['trend_strength']:.2f}\n"
+            message += f"- Тренд EMA: {analysis['trend']['ema_trend']}\n"
+            message += f"- Тренд MACD: {analysis['trend']['macd_trend']}\n"
+            message += f"- Тренд Ишимоку: {analysis['trend']['ichimoku_trend']}\n"
             
-            msg += f"\nАнализ импульса:\n"
-            msg += f"- RSI: {analysis['momentum']['rsi']:.2f} ({analysis['momentum']['rsi_signal']})\n"
-            msg += f"- Стохастик: {analysis['momentum']['stoch_k']:.2f}/{analysis['momentum']['stoch_d']:.2f}\n"
-            msg += f"- Williams %R: {analysis['momentum']['williams_r']:.2f} ({analysis['momentum']['williams_signal']})\n"
-            msg += f"- Скорость изменения: {analysis['momentum']['roc']:.2f}% ({analysis['momentum']['roc_signal']})\n"
+            message += f"\nАнализ импульса:\n"
+            message += f"- RSI: {analysis['momentum']['rsi']:.2f} ({analysis['momentum']['rsi_signal']})\n"
+            message += f"- Стохастик: {analysis['momentum']['stoch_k']:.2f}/{analysis['momentum']['stoch_d']:.2f}\n"
+            message += f"- Williams %R: {analysis['momentum']['williams_r']:.2f} ({analysis['momentum']['williams_signal']})\n"
+            message += f"- Скорость изменения: {analysis['momentum']['roc']:.2f}% ({analysis['momentum']['roc_signal']})\n"
             
-            msg += f"\nАнализ объема:\n"
-            msg += f"- Всплеск объема: {'Да' if analysis['volume']['volume_spike'] else 'Нет'}\n"
-            msg += f"- Тренд индекса силы: {'Положительный' if analysis['volume']['force_trend'] else 'Отрицательный'}\n"
-            msg += f"- Тренд OBV: {'Положительный' if analysis['volume']['obv_trend'] else 'Отрицательный'}\n"
+            message += f"\nАнализ объема:\n"
+            message += f"- Всплеск объема: {'Да' if analysis['volume']['volume_spike'] else 'Нет'}\n"
+            message += f"- Тренд индекса силы: {'Положительный' if analysis['volume']['force_trend'] else 'Отрицательный'}\n"
+            message += f"- Тренд OBV: {'Положительный' if analysis['volume']['obv_trend'] else 'Отрицательный'}\n"
             
-            msg += f"\nАнализ волатильности:\n"
-            msg += f"- ATR: {analysis['volatility']['atr']:.2f} ({analysis['volatility']['atr_percent']:.2f}%)\n"
-            msg += f"- Ширина полос Боллинджера: {analysis['volatility']['bb_width']:.2f}\n"
+            message += f"\nАнализ волатильности:\n"
+            message += f"- ATR: {analysis['volatility']['atr']:.2f} ({analysis['volatility']['atr_percent']:.2f}%)\n"
+            message += f"- Ширина полос Боллинджера: {analysis['volatility']['bb_width']:.2f}\n"
             
-            send_telegram_message(msg)
+            # Plot and send chart
+            chart_path = plot_signal(df, symbol, TIMEFRAME, signal['signal'], 
+                                       signal['price'], signal['stop_loss'], signal['take_profit'])
+            if chart_path:
+                send_telegram_message(message, chart_path)
             logger.info(f"Сгенерирован сигнал для {symbol}: {signal['signal']}")
-        
+
     except Exception as e:
-        logger.error(f"Ошибка при анализе {symbol}: {str(e)}")
+        logger.error(f"Error analyzing {symbol}: {str(e)}")
         raise
