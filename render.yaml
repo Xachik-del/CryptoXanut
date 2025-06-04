@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: cryptoxanut-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m bot.core.main
+    envVars:
+      - key: TELEGRAM_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: BINANCE_API_KEY
+        sync: false
+      - key: BINANCE_API_SECRET
+        sync: false 

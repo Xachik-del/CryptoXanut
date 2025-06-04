@@ -1,4 +1,9 @@
 # config.py
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Торговые пары для фьючерсов
 SYMBOLS = [
@@ -15,12 +20,12 @@ SYMBOLS = [
 ]
 
 # Настройки Telegram
-TELEGRAM_TOKEN = "7910233528:AAF9RuaSa_UyxFmgLlAC9REDtG9OfJOHOFE"
-TELEGRAM_CHAT_ID = "705512639"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
 # API ключи Binance
-BINANCE_API_KEY = "65PXvD8ddnf8efNpy7tc4H5LmBpPIttCOSH8AVGIOyXzfxIHcnUT5duhlnjbVw0d"
-BINANCE_API_SECRET = "rKgV2Cxpg6Ga6XKYpub98SbAyg0rMw1QA61DJPQDG09hiHSJgc9UwqSqnqwXkkCf"
+BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
+BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
 
 # Таймфреймы для фьючерсной торговли
 TIMEFRAME = "5m"  # 1-минутный таймфрейм для краткосрочной торговли
